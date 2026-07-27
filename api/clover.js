@@ -262,11 +262,39 @@ export default async function handler(req, res) {
         return lis.some(li => li.isRevenue !== false && li.isOrderFee !== true && !li.refunded);
       };
 
+      // Clover pages with limit/offset (no cursor). 500 per page; busy
+      // merchants exceed that in a long window, so follow offsets or revenue,
+      // daily trends, and items all silently undercount.
+      async function fetchAllOrders() {
+        const MAX_PAGES = 10; // 5,000 orders — safety cap against runaway loops
+        const elements = [];
+        let offset = 0, pages = 0, truncated = false;
+        while (true) {
+          const r = await cloverFetch(`${BASE}/orders?filter=createdTime>=${windowStart}&filter=createdTime<${now}&limit=500&offset=${offset}&expand=lineItems`);
+          if (!r.ok) {
+            // First page failing is a hard error (caller surfaces it). A later
+            // page failing: keep what we have rather than dropping everything.
+            if (pages === 0) return r;
+            truncated = true;
+            break;
+          }
+          const d = await r.json();
+          const els = d.elements || [];
+          for (const e of els) elements.push(e);
+          pages++;
+          if (els.length < 500) break;
+          if (pages >= MAX_PAGES) { truncated = true; break; }
+          offset += 500;
+        }
+        // Mimics the fetch Response surface (ok/status/json) so callers are unchanged.
+        return { ok: true, status: 200, json: async () => ({ elements, truncated, pagesFetched: pages }) };
+      }
+
       if (what === 'summary') {
         // Revenue counts PAID orders plus sandbox revenue-bearing OPEN orders
         // (see countsAsRevenue). Built on orders + lineItems so it needs only
         // the Orders permission. All money fields are in cents.
-        const r = await cloverFetch(`${BASE}/orders?filter=createdTime>=${windowStart}&filter=createdTime<${now}&limit=500&expand=lineItems`);
+        const r = await fetchAllOrders();
         if (!r.ok) { const t = await r.text(); return res.status(502).json({ error: 'Clover fetch failed', status: r.status, detail: t }); }
         const data = await r.json();
 
@@ -312,7 +340,10 @@ export default async function handler(req, res) {
         // payment-method breakdown below falls back to crediting the order total.
         // To get a real credit/debit/cash split, add the Payments read permission
         // to the Clover app and restore `,payments` to the expand.
-        const r = await cloverFetch(`${BASE}/orders?filter=createdTime>=${windowStart}&filter=createdTime<${now}&limit=500&expand=lineItems`);
+        // (NOTE: the PRODUCTION app now has Payments — added during app-market
+        // submission — so this can be restored for production post-approval.
+        // The sandbox app still lacks it.)
+        const r = await fetchAllOrders();
         if (!r.ok) { const t = await r.text(); return res.status(502).json({ error: 'Clover fetch failed', status: r.status, detail: t }); }
         const data = await r.json();
         const paid = (data.elements || []).filter(countsAsRevenue);
@@ -332,6 +363,8 @@ export default async function handler(req, res) {
 
         // Per-item rollup. Clover unitQty is fixed-point: 1000 = 1 unit, so the
         // real quantity is unitQty/1000. Only count line items flagged isRevenue.
+        // Also remember the inventory item id (present when the line was rung
+        // from inventory) so we can resolve its category below.
         const itemMap = {};
         for (const o of paid) {
           for (const li of (o.lineItems?.elements || [])) {
@@ -339,13 +372,48 @@ export default async function handler(req, res) {
             const name = li.name || 'Unknown';
             const qty = (typeof li.unitQty === 'number' && li.unitQty > 0) ? li.unitQty / 1000 : 1;
             const priceCents = typeof li.price === 'number' ? li.price : 0;
-            if (!itemMap[name]) itemMap[name] = { name, qtySold: 0, revenue: 0 };
+            if (!itemMap[name]) itemMap[name] = { name, qtySold: 0, revenue: 0, invId: null };
             itemMap[name].qtySold += qty;
             itemMap[name].revenue += priceCents;
+            if (li.item && li.item.id && !itemMap[name].invId) itemMap[name].invId = li.item.id;
           }
         }
+
+        // Category enrichment via the inventory Items API (Read: Inventory,
+        // which the app already has). Map inventory item id — or, for custom
+        // line items, the lowercased name — to the item's first category.
+        // Strictly optional: any failure leaves items 'Uncategorized' and must
+        // NEVER fail the sync.
+        const catById = {}, catByName = {};
+        try {
+          let ioffset = 0, ipages = 0;
+          while (ipages < 5) { // up to 5,000 inventory items
+            const ir = await cloverFetch(`${BASE}/items?limit=1000&offset=${ioffset}&expand=categories`);
+            if (!ir.ok) break;
+            const idata = await ir.json();
+            const els = idata.elements || [];
+            for (const inv of els) {
+              const cat = inv.categories && inv.categories.elements
+                       && inv.categories.elements[0] && inv.categories.elements[0].name;
+              if (!cat) continue;
+              if (inv.id) catById[inv.id] = cat;
+              if (inv.name) catByName[String(inv.name).toLowerCase()] = cat;
+            }
+            ipages++;
+            if (els.length < 1000) break;
+            ioffset += 1000;
+          }
+        } catch (e) { /* enrichment is best-effort */ }
+
         const items = Object.values(itemMap)
-          .map(it => ({ name: it.name, qtySold: Math.round(it.qtySold * 1000) / 1000, revenue: Math.round(it.revenue) / 100 }))
+          .map(it => ({
+            name: it.name,
+            qtySold: Math.round(it.qtySold * 1000) / 1000,
+            revenue: Math.round(it.revenue) / 100,
+            category: (it.invId && catById[it.invId])
+                   || catByName[String(it.name).toLowerCase()]
+                   || 'Uncategorized'
+          }))
           .sort((a, b) => b.revenue - a.revenue);
 
         // Payment-method breakdown from each order's payments[].tender. Clover tender
@@ -391,6 +459,8 @@ export default async function handler(req, res) {
           dailyRevenue,
           items,
           payments,
+          truncated: !!data.truncated,
+          ordersFetched: paid.length,
           merchant_id: MID
         });
       }

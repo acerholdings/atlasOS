@@ -247,21 +247,45 @@ export default async function handler(req, res) {
       // filter and a date-time range on created_at. Completed sales have
       // state COMPLETED; we treat COMPLETED (or any order with a positive
       // total) as revenue.
+      // Square caps orders/search at 500 per page and returns a cursor for
+      // the next page. Busy merchants easily exceed 500 orders in a 30-90
+      // day window, so we MUST follow the cursor or revenue, daily trends,
+      // and items all silently undercount.
       async function searchOrders() {
-        const body = {
-          location_ids: [LOCATION],
-          query: {
-            filter: {
-              date_time_filter: { created_at: { start_at: windowStartISO, end_at: nowISO } }
-              // No state_filter: we want OPEN + COMPLETED. Production sales are
-              // COMPLETED; the Sandbox/API-created test orders are OPEN. The
-              // countsAsRevenue() check below decides what actually counts.
+        const MAX_PAGES = 10; // 5,000 orders — safety cap against runaway loops
+        const orders = [];
+        let cursor = null, pages = 0, truncated = false;
+        do {
+          const body = {
+            location_ids: [LOCATION],
+            query: {
+              filter: {
+                date_time_filter: { created_at: { start_at: windowStartISO, end_at: nowISO } }
+                // No state_filter: we want OPEN + COMPLETED. Production sales are
+                // COMPLETED; the Sandbox/API-created test orders are OPEN. The
+                // countsAsRevenue() check below decides what actually counts.
+              },
+              sort: { sort_field: 'CREATED_AT', sort_order: 'DESC' }
             },
-            sort: { sort_field: 'CREATED_AT', sort_order: 'DESC' }
-          },
-          limit: 500
-        };
-        return sqFetch(`${SQUARE_BASE}/v2/orders/search`, { method: 'POST', body: JSON.stringify(body) });
+            limit: 500
+          };
+          if (cursor) body.cursor = cursor;
+          const r = await sqFetch(`${SQUARE_BASE}/v2/orders/search`, { method: 'POST', body: JSON.stringify(body) });
+          if (!r.ok) {
+            // First page failing is a hard error (caller surfaces it). A later
+            // page failing: keep what we have rather than dropping everything.
+            if (pages === 0) return r;
+            truncated = true;
+            break;
+          }
+          const d = await r.json();
+          for (const o of (d.orders || [])) orders.push(o);
+          cursor = d.cursor || null;
+          pages++;
+          if (cursor && pages >= MAX_PAGES) { truncated = true; break; }
+        } while (cursor);
+        // Mimics the fetch Response surface (ok/status/json) so callers are unchanged.
+        return { ok: true, status: 200, json: async () => ({ orders, truncated, pagesFetched: pages }) };
       }
 
       // Revenue counts an order unless it's canceled. Production: real sales are
@@ -320,6 +344,8 @@ export default async function handler(req, res) {
 
         // Per-item rollup from order line_items. quantity is a string; revenue
         // uses total_money (gross_sales_money also available). Skip non-revenue.
+        // Also remember each item's catalog_object_id (the catalog VARIATION id)
+        // so we can resolve its category below.
         const itemMap = {};
         for (const o of paid) {
           for (const li of (o.line_items || [])) {
@@ -327,13 +353,57 @@ export default async function handler(req, res) {
             const qty = parseFloat(li.quantity || '1') || 1;
             const cents = (li.total_money && typeof li.total_money.amount === 'number') ? li.total_money.amount
                         : (li.gross_sales_money && li.gross_sales_money.amount) || 0;
-            if (!itemMap[name]) itemMap[name] = { name, qtySold: 0, revenue: 0 };
+            if (!itemMap[name]) itemMap[name] = { name, qtySold: 0, revenue: 0, catObjId: null };
             itemMap[name].qtySold += qty;
             itemMap[name].revenue += cents;
+            if (li.catalog_object_id && !itemMap[name].catObjId) itemMap[name].catObjId = li.catalog_object_id;
           }
         }
+
+        // Category enrichment: line items only carry the catalog VARIATION id,
+        // so walk the catalog (ITEMs + CATEGORYs) and map variation → item →
+        // category name. Uses ITEMS_READ, which the app already requests.
+        // Strictly optional: any failure leaves items 'Uncategorized' and must
+        // NEVER fail the sync.
+        const varToCategory = {};
+        try {
+          const catNames = {};  // category id → name
+          const itemObjs = [];  // ITEM catalog objects
+          let cur = null, cpages = 0;
+          do {
+            const curl = `${SQUARE_BASE}/v2/catalog/list?types=${encodeURIComponent('ITEM,CATEGORY')}`
+                       + (cur ? `&cursor=${encodeURIComponent(cur)}` : '');
+            const cr = await sqFetch(curl);
+            if (!cr.ok) break;
+            const cd = await cr.json();
+            for (const obj of (cd.objects || [])) {
+              if (obj.type === 'CATEGORY' && obj.category_data) catNames[obj.id] = obj.category_data.name || '';
+              else if (obj.type === 'ITEM' && obj.item_data) itemObjs.push(obj);
+            }
+            cur = cd.cursor || null;
+          } while (cur && ++cpages < 10);
+          for (const it of itemObjs) {
+            const idata = it.item_data;
+            // Category id lives in reporting_category (preferred), the
+            // categories[] array (current API), or category_id (legacy).
+            const catId = (idata.reporting_category && idata.reporting_category.id)
+                       || (Array.isArray(idata.categories) && idata.categories[0] && idata.categories[0].id)
+                       || idata.category_id || null;
+            const catName = (catId && catNames[catId]) || null;
+            if (!catName) continue;
+            for (const v of (idata.variations || [])) {
+              if (v && v.id) varToCategory[v.id] = catName;
+            }
+          }
+        } catch (e) { /* enrichment is best-effort */ }
+
         const items = Object.values(itemMap)
-          .map(it => ({ name: it.name, qtySold: Math.round(it.qtySold * 1000) / 1000, revenue: Math.round(it.revenue) / 100 }))
+          .map(it => ({
+            name: it.name,
+            qtySold: Math.round(it.qtySold * 1000) / 1000,
+            revenue: Math.round(it.revenue) / 100,
+            category: (it.catObjId && varToCategory[it.catObjId]) || 'Uncategorized'
+          }))
           .sort((a, b) => b.revenue - a.revenue);
 
         // Payment-method breakdown from each order's tenders[]. Square tender.type is
@@ -379,6 +449,8 @@ export default async function handler(req, res) {
           dailyRevenue,
           items,
           payments,
+          truncated: !!data.truncated,
+          ordersFetched: paid.length,
           location_id: LOCATION
         });
       }
