@@ -131,7 +131,10 @@ body{-webkit-text-size-adjust:100%;background:var(--black);color:var(--text);fon
         <div class="kpi-value" id="labor-weekly-cost">—</div>
         <div class="kpi-sub" style="color:var(--orange);">⚠ Estimated · real payroll via Gusto (coming soon)</div>
       </div>
-      <div class="kpi-card">
+      <!-- Revenue/Labor $ tile HIDDEN (founder decision 7/28): computed as 1/laborRate,
+           it restates the labor %% card — information-free until real payroll dollars
+           exist. Returns when the Gusto integration provides actual labor costs. -->
+      <div class="kpi-card" style="display:none">
         <div class="kpi-label">Revenue / Labor $</div>
         <div class="kpi-value" id="labor-rev-ratio">—</div>
         <div class="kpi-sub">Per $1 of labor spent</div>

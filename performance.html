@@ -252,7 +252,7 @@ body{-webkit-text-size-adjust:100%;background:var(--black);color:var(--text);fon
             <div class="heatmap-cell" id="hm-dinner-thu"></div>
             <div class="heatmap-cell" id="hm-dinner-fri"></div>
             <div class="heatmap-cell" id="hm-dinner-sat"></div>
-            <div class="heatmap-cell" id="hm-dinner-sun"></div>>
+            <div class="heatmap-cell" id="hm-dinner-sun"></div>
           </div>
 
           <!-- Legend -->
@@ -650,29 +650,54 @@ const countUp = (id,target,format) => {
     const coversLbl = document.getElementById('vs-covers-label');
     if (coversLbl) coversLbl.textContent = _pnoun;
   } catch(e) {}
-  // No dollar figures: per-cell amounts were fabricated precision (invented weights × weekly avg).
+  // REAL busy-days heatmap (founder decision 7/28): the old version showed an
+  // industry-typical pattern (dayWeights × invented 32/68 lunch/dinner split).
+  // Now: with ≥7 days of real daily revenue, show ACTUAL per-weekday intensity
+  // for ANY category; without it, hide the card — no invented patterns. The
+  // lunch/dinner axis is dropped entirely (needs order timestamps we don't have).
   try {
-    const dayWeights = ((HRZN.getBenchmarks && HRZN.getBenchmarks().dayWeights) || {mon:0.85,tue:0.70,wed:0.95,thu:1.05,fri:1.45,sat:1.35,sun:1.10}); // central: BENCHMARKS.restaurant
-    const lunchSplit = 0.32, dinnerSplit = 0.68;
-    const days = ['mon','tue','wed','thu','fri','sat','sun'];
-    const allVals = days.map(d => [dayWeights[d]*lunchSplit, dayWeights[d]*dinnerSplit]).flat();
-    const maxVal = Math.max(...allVals);
-    const intensityLabel = (ratio) => ratio >= 0.7 ? 'High' : ratio >= 0.4 ? 'Med' : 'Low';
-
-    days.forEach(day => {
-      const lunchRatio = (dayWeights[day] * lunchSplit) / maxVal;
-      const dinnerRatio = (dayWeights[day] * dinnerSplit) / maxVal;
-      const lunchEl = document.getElementById('hm-lunch-' + day);
-      const dinnerEl = document.getElementById('hm-dinner-' + day);
-      if(lunchEl){
-        lunchEl.style.background = 'rgba(201,168,76,' + (0.1 + lunchRatio*0.85).toFixed(2) + ')';
-        lunchEl.textContent = intensityLabel(lunchRatio);
-      }
-      if(dinnerEl){
-        dinnerEl.style.background = 'rgba(201,168,76,' + (0.1 + dinnerRatio*0.85).toFixed(2) + ')';
-        dinnerEl.textContent = intensityLabel(dinnerRatio);
-      }
-    });
+    const hmCard2 = document.getElementById('daypart-heatmap-card');
+    const daily = Array.isArray(d._dailyRevenue) ? d._dailyRevenue : null;
+    const dayKeys = ['sun','mon','tue','wed','thu','fri','sat']; // getDay() order
+    const sums = {}, counts = {};
+    if (daily && daily.length >= 7) {
+      daily.forEach(r => {
+        const wd = dayKeys[new Date(r.date + 'T12:00:00').getDay()];
+        sums[wd] = (sums[wd] || 0) + (r.revenue || 0);
+        counts[wd] = (counts[wd] || 0) + 1;
+      });
+    }
+    const avgs = {};
+    Object.keys(sums).forEach(k => { avgs[k] = sums[k] / counts[k]; });
+    const covered = Object.keys(avgs).length;
+    if (hmCard2 && covered >= 5 && hrznHasUsableData(d)) {
+      // Real data: retitle, clear the industry-pattern warning + explainer,
+      // collapse to a single "Revenue" row.
+      const title = hmCard2.querySelector('.card-title');
+      if (title) title.textContent = 'Busy Days — Revenue by Day of Week';
+      const warn = hmCard2.querySelector('.card-header div:last-child');
+      if (warn && warn !== title) { warn.textContent = 'From your daily revenue'; warn.style.color = 'var(--green)'; }
+      const explainer = hmCard2.querySelector('.card-body > div');
+      if (explainer && explainer.style) explainer.style.display = 'none';
+      const rowLabels = hmCard2.querySelectorAll('.heatmap-grid > div');
+      rowLabels.forEach(el => { if (el.textContent.trim() === 'Lunch') el.textContent = 'Revenue'; });
+      const maxAvg = Math.max.apply(null, Object.values(avgs)) || 1;
+      const intensityLabel = (r) => r >= 0.7 ? 'High' : r >= 0.4 ? 'Med' : 'Low';
+      ['mon','tue','wed','thu','fri','sat','sun'].forEach(day => {
+        const el = document.getElementById('hm-lunch-' + day);
+        const del = document.getElementById('hm-dinner-' + day);
+        if (del) del.style.display = 'none';
+        if (!el) return;
+        if (avgs[day] == null) { el.style.background = 'rgba(128,128,128,0.08)'; el.textContent = '·'; return; }
+        const ratio = avgs[day] / maxAvg;
+        el.style.background = 'rgba(201,168,76,' + (0.1 + ratio * 0.85).toFixed(2) + ')';
+        el.textContent = intensityLabel(ratio);
+      });
+      rowLabels.forEach(el => { if (el.textContent.trim() === 'Dinner') el.style.display = 'none'; });
+      hmCard2.style.display = '';
+    } else if (hmCard2) {
+      hmCard2.style.display = 'none';
+    }
   } catch(e) {}
 
   // Health Score — single source of truth (HRZN.getHealthScore). No fabricated sub-scores.

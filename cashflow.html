@@ -289,6 +289,17 @@ tr:hover td{background:rgba(128,128,128,0.03);}
   <!-- DISCLAIMER FOOTER -->
   <div style="padding:16px 28px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;">
     <p style="font-size:10px;color:var(--text-dim);line-height:1.6;max-width:900px;">
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header">
+          <div class="card-title">Cash Flow Insights <span style="font-size:10px;color:var(--orange);">⚠ Est.</span></div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="generateCFInsights(true)" id="cfRefreshBtn" style="background:none;border:1px solid var(--border);color:var(--text-dim);font-size:10px;padding:4px 10px;border-radius:6px;cursor:pointer;">+ Refresh</button>
+            <button onclick="generateMoreCFInsights()" id="cfMoreBtn" style="background:none;border:1px solid var(--border);color:var(--text-dim);font-size:10px;padding:4px 10px;border-radius:6px;cursor:pointer;">+ Generate More</button>
+          </div>
+        </div>
+        <div class="card-body" id="cfInsightsContainer"><div style="padding:24px;text-align:center;color:var(--text-dim);font-size:12px;">Loading insights…</div></div>
+      </div>
+
       <strong style="color:var(--text-dim);">Data Disclaimer:</strong> Figures marked ⚠ Est. are projections based on industry averages and your uploaded data — not audited financial statements. Real data requires live integrations (Clover API, Gusto, etc.). AI-generated insights are for informational purposes only and do not constitute professional financial or business advice. See our <a href="terms.html" style="color:var(--text-dim);text-decoration:underline;">Terms of Service</a> for full details.
     </p>
   </div>
@@ -567,6 +578,12 @@ document.addEventListener('DOMContentLoaded',()=>{
   set('cf-net', cfEmpty ? '—' : (isPositive?'+':'-')+fmt(netCashFlow) + estTag);
   // Runway requires cash-on-hand, which no current data source provides. Never fabricate it.
   set('cf-runway', '—');
+  // Context for the AI insights section (figures already computed above).
+  try {
+    window._cfCtx = cfEmpty ? '' : ('Monthly inflow (avg): $' + monthly.toLocaleString() +
+      '. Estimated monthly outflow: $' + totalMonthlyExp.toLocaleString() + (anyEstimated ? ' (contains industry-ratio estimates, marked Est.)' : ' (from your P&L entries)') +
+      '. Net cash flow: ' + (isPositive ? '+' : '-') + '$' + Math.abs(netCashFlow).toLocaleString() + '/month.');
+  } catch(e) { window._cfCtx = ''; }
   const runwayNote = document.getElementById('cf-runway');
   if(runwayNote && runwayNote.nextElementSibling) runwayNote.nextElementSibling.textContent = 'Needs cash on hand';
 
@@ -724,6 +741,50 @@ function renderChart(rows){
     ctx.stroke();
   });
 }
+
+// ── AI CASH FLOW INSIGHTS (added 7/28, founder decision) ──
+let _cfInsights = [];
+function renderCFInsights(){
+  const c = document.getElementById('cfInsightsContainer');
+  if (!c) return;
+  if (!_cfInsights.length) { c.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-dim);font-size:12px;">No distinct insights from current data.</div>'; return; }
+  c.innerHTML = _cfInsights.map(i => '<div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);"><div style="font-size:18px;flex-shrink:0;">' + (i.emoji||'💡') + '</div><div><div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px;">' + (i.title||'') + '</div><div style="font-size:12px;color:var(--text-dim);line-height:1.6;">' + (i.insight||'') + '</div></div></div>').join('');
+}
+async function generateCFInsights(isRefresh){
+  const c = document.getElementById('cfInsightsContainer');
+  const d = HRZN.getData();
+  if (!hrznHasUsableData(d)) {
+    if (c) c.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-dim);font-size:12px;">' + (d._source === 'empty' ? 'Upload your data to get AI cash flow insights.' : 'No sales in your connected POS yet — insights will appear once sales come in.') + '</div>';
+    return;
+  }
+  if (c && !isRefresh) c.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-dim);font-size:12px;">Analyzing your cash flow…</div>';
+  try {
+    const opts = isRefresh && _cfInsights.length ? { exclude: _cfInsights.map(i=>i.title) } : {};
+    const { system, prompt } = HRZN.getInsightPrompt('cashflow', window._cfCtx || '', opts);
+    const r = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+((typeof hrznGetToken==='function')?hrznGetToken():(localStorage.getItem('hrzn_token')||''))}, body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:1500, system, messages:[{role:'user',content:prompt}] }) });
+    const data = await r.json();
+    const text = (data.content||[]).map(b=>b.text||'').join('');
+    const items = HRZN.parseInsights(text);
+    _cfInsights = isRefresh ? _cfInsights.concat(items).slice(0, HRZN.INSIGHT_MAX || 18) : items;
+    renderCFInsights();
+  } catch(e) {
+    if (c) c.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-dim);font-size:12px;">Could not load insights — try Refresh.</div>';
+  }
+}
+async function generateMoreCFInsights(){
+  if (_cfInsights.length >= (HRZN.INSIGHT_MAX || 18)) return;
+  const btn = document.getElementById('cfMoreBtn'); if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+  try {
+    const { system, prompt } = HRZN.getInsightPrompt('cashflow', window._cfCtx || '', { exclude: _cfInsights.map(i=>i.title), more: true, count: 4 });
+    const r = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+((typeof hrznGetToken==='function')?hrznGetToken():(localStorage.getItem('hrzn_token')||''))}, body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:1500, system, messages:[{role:'user',content:prompt}] }) });
+    const data = await r.json();
+    const items = HRZN.parseInsights((data.content||[]).map(b=>b.text||'').join(''));
+    if (items.length) { _cfInsights = _cfInsights.concat(items).slice(0, HRZN.INSIGHT_MAX || 18); renderCFInsights(); }
+    else { const c = document.getElementById('cfInsightsContainer'); if (c) c.insertAdjacentHTML('beforeend', '<div style="padding:12px 0;font-size:10px;color:var(--text-dim);font-style:italic;">That\'s the distinct analysis your current data supports.</div>'); }
+  } catch(e) {}
+  if (btn) { btn.disabled = false; btn.textContent = '+ Generate More'; }
+}
+generateCFInsights(false);
 </script>
 
 <!-- PAYWALL MODAL -->

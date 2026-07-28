@@ -1713,6 +1713,7 @@ CRITICAL — DO NOT FABRICATE TARGETS OR NUMBERS:
 
     const prompts = {
       sales:   `Analyze the sales and payment data. Identify what is performing well and what needs attention. ${mixRule}`,
+      cashflow:`Analyze the cash flow data — monthly inflow vs outflow, net position, and the cost lines that most affect it. Several outflow lines may be ESTIMATES from industry ratios (they are marked); frame those as estimates and never present them as actuals. Focus on the single highest-impact lever on net cash flow. ${mixRule}`,
       pl:      `Analyze the profit & loss data. Focus on cost structure vs industry benchmarks, margin health, and the single highest-impact action to improve profitability. ${mixRule}`,
       labor:   `Analyze the labor data — labor cost as a % of revenue vs the target and industry benchmarks, and where labor efficiency is strong or weak. Use ONLY figures present in the data; the labor rate may be an estimate, so frame accordingly and do not fabricate per-shift or per-employee specifics that require payroll integration. ${mixRule}`,
       revenue: `Analyze the revenue data — trends, day-of-week and period patterns, ${ticketTerm}, and the highest-impact lever to grow revenue. Use exact figures from the data. ${mixRule}`,
@@ -1724,7 +1725,7 @@ CRITICAL — DO NOT FABRICATE TARGETS OR NUMBERS:
 
     const basePrompt = prompts[type] || prompts.sales;
     // operator/reports are conversational/long-form — they don't take the JSON card format.
-    const cardTypes = ['sales', 'pl', 'labor', 'revenue', 'alerts', 'menu'];
+    const cardTypes = ['sales', 'pl', 'labor', 'revenue', 'alerts', 'menu', 'cashflow'];
     let fullPrompt = moreFraming + basePrompt;
     if (cardTypes.includes(type)) {
       fullPrompt += ' ' + honestyRule + ' ' + jsonFormat + exclusionRule;
