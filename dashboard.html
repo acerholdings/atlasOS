@@ -337,13 +337,20 @@ function countUp(id,target,format){
 
 function renderDataBadges(sources){
   const c=document.getElementById('page-data-sources');if(!c)return;
+  // A live POS connection replaces the sales CSV. When the active source is
+  // a live API with synced data, show the chip as "live" — the old logic only
+  // checked the CSV key, so it said "not uploaded" right next to the
+  // "Live API · Real-time" badge.
+  const liveApi=(typeof HRZN!=='undefined'&&HRZN.getSource&&HRZN.getSource()==='api'&&!!localStorage.getItem('hrzn-data-api'));
   c.innerHTML=sources.map(s=>{
     const stored=localStorage.getItem(s.key)||(s.oldKey?localStorage.getItem(s.oldKey):null);
-    const loaded=!!stored;
+    const live=liveApi&&s.replacedByLive!==false;
+    const loaded=!!stored||live;
     const color=loaded?'var(--green)':'var(--text-dim)';
     const bg=loaded?'rgba(76,175,125,0.1)':'rgba(128,128,128,0.08)';
     const border=loaded?'rgba(76,175,125,0.2)':'rgba(128,128,128,0.15)';
-    return '<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:'+color+';background:'+bg+';border:1px solid '+border+';padding:3px 8px;border-radius:10px;margin-right:4px;">'+(loaded?'•':'○')+' '+s.label+(loaded?'':' -- not uploaded')+'</span>';
+    const suffix=live?' -- live':(loaded?'':' -- not uploaded');
+    return '<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:'+color+';background:'+bg+';border:1px solid '+border+';padding:3px 8px;border-radius:10px;margin-right:4px;">'+(loaded?'•':'○')+' '+s.label+suffix+'</span>';
   }).join('');
 }
 
