@@ -71,7 +71,7 @@ Return ONLY JSON.`
       const lines = csv.split('\n').map(l => l.trim());
   
         // Extract period from line 2
-        const period = lines[1] ? lines[1].replace(/"/g, '').trim() : '';
+        let period = lines[1] ? lines[1].replace(/"/g, '').trim() : '';
   
         // Parse summary totals from header
         const parseAmt = (label) => {
@@ -216,6 +216,9 @@ Return ONLY JSON.`
             }
           }
           if (cols) {
+            // Generic tables have no period line — line 2 is DATA, not a date
+            // range. Without this, a raw CSV row leaked into the page subtitle.
+            period = '';
             for (let i = headerIdx + 1; i < lines.length; i++) {
               if (!lines[i]) continue;
               const p = parseCSVLine(lines[i]);
