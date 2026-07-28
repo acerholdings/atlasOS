@@ -411,7 +411,7 @@ const months = HRZN.getMonths(d);
   // Day weights — used ONLY as a last-resort estimate, and only for categories
   // where a day-of-week revenue shape is meaningful (restaurants). For retail/
   // online, or when we have real per-day data, we don't fabricate these.
-  const dayWeights = {mon:0.85,tue:0.70,wed:0.95,thu:1.05,fri:1.45,sat:1.35,sun:1.10};
+  const dayWeights = ((HRZN.getBenchmarks && HRZN.getBenchmarks().dayWeights) || {mon:0.85,tue:0.70,wed:0.95,thu:1.05,fri:1.45,sat:1.35,sun:1.10}); // central: BENCHMARKS.restaurant
   const dayNames = {mon:'Monday',tue:'Tuesday',wed:'Wednesday',thu:'Thursday',fri:'Friday',sat:'Saturday',sun:'Sunday'};
   const dayOrder = ['fri','sat','sun','thu','wed','mon','tue'];
   const allDays = ['mon','tue','wed','thu','fri','sat','sun'];
@@ -424,7 +424,8 @@ const months = HRZN.getMonths(d);
   const realDaily = Array.isArray(d._dailyRevenue) ? d._dailyRevenue : null;
   const hasRealDaily = !!(realDaily && realDaily.length >= 2);  // need ≥2 days to be a "breakdown"
   const canEstimate = revConceptsTop.dayparts !== false;        // restaurant-style only
-  const revEmpty = d._source === 'empty';
+  // Broadened: live sources with zero revenue must dash too (hasUsableData).
+  const revEmpty = !hrznHasUsableData(d);
 
   // Best day: real if we have it, else estimate only for restaurants, else dash.
   if (revEmpty) {
@@ -522,7 +523,7 @@ const months = HRZN.getMonths(d);
   const dpThead = dpCard ? dpCard.querySelector('thead tr') : null;
   const tableBody = document.getElementById('rev-table-body');
 
-  if (dpCard && (revConcepts.dayparts === false || d._source === 'empty')) {
+  if (dpCard && (revConcepts.dayparts === false || !hrznHasUsableData(d))) {
     dpCard.style.display = 'none';
   } else if (dpCard && hasRealDaily) {
     // REAL per-day data — show honest totals (no fabricated Lunch/Dinner split).
@@ -630,8 +631,8 @@ async function generateRevenueInsights() {
   const moreBtn = document.getElementById('revMoreBtn');
   if (!container) return;
   const _revD = (typeof HRZN !== 'undefined' && HRZN.getData) ? HRZN.getData() : {};
-  if (_revD._source === 'empty') {
-    container.innerHTML = '<div style="padding:20px;text-align:center;font-size:12px;color:var(--text-dim);">Upload your data to get AI revenue insights.</div>';
+  if (!hrznHasUsableData(_revD)) {
+    container.innerHTML = '<div style="padding:20px;text-align:center;font-size:12px;color:var(--text-dim);">' + (_revD._source === 'empty' ? 'Upload your data to get AI revenue insights.' : 'No sales in your connected POS yet — insights will appear once sales come in.') + '</div>';
     if (refreshBtn) refreshBtn.disabled = true;
     if (moreBtn) moreBtn.disabled = true;
     return;

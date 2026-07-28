@@ -207,12 +207,12 @@ body{-webkit-text-size-adjust:100%;background:var(--black);color:var(--text);fon
       </div>
     </div>
     <div class="trend-grid fade-2">
-      <div class="trend-card"><div class="kpi-label">Weekly Revenue</div><div class="kpi-value" id="perf-weekly-revenue">—</div><div style="font-size:11px;color:var(--green);margin-bottom:12px;" id="kpi-rev-change">Weekly avg</div><svg height="40" width="100%" viewBox="0 0 100 40"><polyline points="0,35 15,30 30,28 45,22 60,20 75,12 90,10 100,8" fill="none" stroke="var(--green)" stroke-width="1.5" opacity="0.8"/></svg></div>
-      <div class="trend-card"><div class="kpi-label">Gross Margin</div><div class="kpi-value" id="perf-gross-margin">—</div><div style="font-size:11px;color:var(--green);margin-bottom:12px;">Overall margin</div><svg height="40" width="100%" viewBox="0 0 100 40"><polyline points="0,30 15,28 30,25 45,22 60,20 75,16 90,14 100,12" fill="none" stroke="var(--green)" stroke-width="1.5" opacity="0.8"/></svg></div>
-      <div class="trend-card"><div class="kpi-label">Labor Cost</div><div class="kpi-value" id="perf-labor-cost">—</div><div style="font-size:11px;color:var(--text-dim);margin-bottom:12px;" id="perf-labor-cost-note">vs target</div><svg height="40" width="100%" viewBox="0 0 100 40"><polyline points="0,20 15,22 30,18 45,25 60,24 75,28 90,26 100,30" fill="none" stroke="var(--text-dim)" stroke-width="1.5" opacity="0.4"/></svg></div>
-      <div class="trend-card"><div class="kpi-label">Items / Week</div><div class="kpi-value" id="perf-covers">—</div><div style="font-size:11px;color:var(--green);margin-bottom:12px;">Total period</div><svg height="40" width="100%" viewBox="0 0 100 40"><polyline points="0,32 15,28 30,26 45,22 60,20 75,16 90,14 100,12" fill="none" stroke="var(--green)" stroke-width="1.5" opacity="0.8"/></svg></div>
-      <div class="trend-card"><div class="kpi-label" id="perf-avg-check-label">Avg Item Price</div><div class="kpi-value" id="perf-avg-check">—</div><div style="font-size:11px;color:var(--text-dim);margin-bottom:12px;">→ Flat vs last week</div><svg height="40" width="100%" viewBox="0 0 100 40"><polyline points="0,20 15,21 30,19 45,20 60,21 75,19 90,20 100,20" fill="none" stroke="var(--text-dim)" stroke-width="1.5" opacity="0.8"/></svg></div>
-      <div class="trend-card" id="perf-turn-card"><div class="kpi-label">Table Turn Rate</div><div class="kpi-value" id="perf-turn-rate">—</div><div style="font-size:11px;color:var(--green);margin-bottom:12px;">Needs orders API</div><svg height="40" width="100%" viewBox="0 0 100 40"><polyline points="0,28 15,26 30,24 45,22 60,18 75,16 90,14 100,12" fill="none" stroke="var(--green)" stroke-width="1.5" opacity="0.8"/></svg></div>
+      <div class="trend-card"><div class="kpi-label">Weekly Revenue</div><div class="kpi-value" id="perf-weekly-revenue">—</div><div style="font-size:11px;color:var(--green);margin-bottom:12px;" id="kpi-rev-change">Weekly avg</div><svg id="spark-rev" style="display:none" height="40" width="100%" viewBox="0 0 100 40"><polyline points="0,35 15,30 30,28 45,22 60,20 75,12 90,10 100,8" fill="none" stroke="var(--green)" stroke-width="1.5" opacity="0.8"/></svg></div>
+      <div class="trend-card"><div class="kpi-label">Gross Margin</div><div class="kpi-value" id="perf-gross-margin">—</div><div style="font-size:11px;color:var(--green);margin-bottom:12px;">Overall margin</div><svg id="spark-margin" style="display:none" height="40" width="100%" viewBox="0 0 100 40"><polyline points="0,30 15,28 30,25 45,22 60,20 75,16 90,14 100,12" fill="none" stroke="var(--green)" stroke-width="1.5" opacity="0.8"/></svg></div>
+      <div class="trend-card"><div class="kpi-label">Labor Cost</div><div class="kpi-value" id="perf-labor-cost">—</div><div style="font-size:11px;color:var(--text-dim);margin-bottom:12px;" id="perf-labor-cost-note">vs target</div><svg id="spark-labor" style="display:none" height="40" width="100%" viewBox="0 0 100 40"><polyline points="0,20 15,22 30,18 45,25 60,24 75,28 90,26 100,30" fill="none" stroke="var(--text-dim)" stroke-width="1.5" opacity="0.4"/></svg></div>
+      <div class="trend-card"><div class="kpi-label">Items / Week</div><div class="kpi-value" id="perf-covers">—</div><div style="font-size:11px;color:var(--green);margin-bottom:12px;">Total period</div><svg id="spark-items" style="display:none" height="40" width="100%" viewBox="0 0 100 40"><polyline points="0,32 15,28 30,26 45,22 60,20 75,16 90,14 100,12" fill="none" stroke="var(--green)" stroke-width="1.5" opacity="0.8"/></svg></div>
+      <div class="trend-card"><div class="kpi-label" id="perf-avg-check-label">Avg Item Price</div><div class="kpi-value" id="perf-avg-check">—</div><div style="font-size:11px;color:var(--text-dim);margin-bottom:12px;">Avg per item</div><svg id="spark-avg" style="display:none" height="40" width="100%" viewBox="0 0 100 40"><polyline points="0,20 15,21 30,19 45,20 60,21 75,19 90,20 100,20" fill="none" stroke="var(--text-dim)" stroke-width="1.5" opacity="0.8"/></svg></div>
+      <div class="trend-card" id="perf-turn-card"><div class="kpi-label">Table Turn Rate</div><div class="kpi-value" id="perf-turn-rate">—</div><div style="font-size:11px;color:var(--green);margin-bottom:12px;">Needs orders API</div><svg id="spark-turn" style="display:none" height="40" width="100%" viewBox="0 0 100 40"><polyline points="0,28 15,26 30,24 45,22 60,18 75,16 90,14 100,12" fill="none" stroke="var(--green)" stroke-width="1.5" opacity="0.8"/></svg></div>
     </div>
     <div class="comp-grid fade-3">
       <div class="card">
@@ -506,6 +506,30 @@ const countUp = (id,target,format) => {
 
   set('perf-date-label', _period || 'Jan 1 – May 28, 2026');
   countUp('perf-weekly-revenue', weekly, fmt);
+  // Real revenue sparkline. All six trend-card sparklines were static SVG
+  // decorations (identical up-trends for every business, including $0 ones).
+  // They now default hidden; only this one has a real series behind it —
+  // drawn from d._dailyRevenue when at least 2 days exist. The other five
+  // stay hidden until real per-metric series exist to draw.
+  try {
+    const _sd = Array.isArray(d._dailyRevenue) ? d._dailyRevenue : null;
+    if (_sd && _sd.length >= 2 && hrznHasUsableData(d)) {
+      const vals = _sd.map(x => x.revenue || 0);
+      const min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+      const span = (max - min) || 1;
+      const pts = vals.map((v, i) => {
+        const x = (i / (vals.length - 1)) * 100;
+        const y = 36 - ((v - min) / span) * 32; // 4px padding top/bottom
+        return x.toFixed(1) + ',' + y.toFixed(1);
+      }).join(' ');
+      const svg = document.getElementById('spark-rev');
+      if (svg) {
+        const pl = svg.querySelector('polyline');
+        if (pl) pl.setAttribute('points', pts);
+        svg.style.display = '';
+      }
+    }
+  } catch (e) {}
   countUp('perf-avg-check', parseFloat(d.avgCheck||0), v=>'$'+v.toFixed(2));
   try { const _pbm2 = HRZN.getBenchmarks ? HRZN.getBenchmarks() : {}; if(_pbm2.avgTicketLabel){ const a=document.getElementById('perf-avg-check-label'); if(a)a.textContent=_pbm2.avgTicketLabel; const b=document.getElementById('vs-check-label'); if(b)b.textContent=_pbm2.avgTicketLabel; } } catch(e){}
   countUp('perf-monthly-revenue', monthly, fmt);
@@ -628,7 +652,7 @@ const countUp = (id,target,format) => {
   } catch(e) {}
   // No dollar figures: per-cell amounts were fabricated precision (invented weights × weekly avg).
   try {
-    const dayWeights = {mon:0.85, tue:0.70, wed:0.95, thu:1.05, fri:1.45, sat:1.35, sun:1.10};
+    const dayWeights = ((HRZN.getBenchmarks && HRZN.getBenchmarks().dayWeights) || {mon:0.85,tue:0.70,wed:0.95,thu:1.05,fri:1.45,sat:1.35,sun:1.10}); // central: BENCHMARKS.restaurant
     const lunchSplit = 0.32, dinnerSplit = 0.68;
     const days = ['mon','tue','wed','thu','fri','sat','sun'];
     const allVals = days.map(d => [dayWeights[d]*lunchSplit, dayWeights[d]*dinnerSplit]).flat();

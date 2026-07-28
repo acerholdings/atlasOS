@@ -239,8 +239,8 @@ let _salesInsights = [];  // shown insights, for exclusion + ceiling
 async function generateInsights(d) {
   const container = document.getElementById('insightsContainer');
   if(!container) return;
-  if (d && d._source === 'empty') {
-    container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-dim);font-size:12px;">Upload your data to get AI sales insights.</div>';
+  if (!hrznHasUsableData(d)) {
+    container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-dim);font-size:12px;">' + (d && d._source !== 'empty' ? 'No sales in your connected POS yet — insights will appear once sales come in.' : 'Upload your data to get AI sales insights.') + '</div>';
     return;
   }
   container.innerHTML = '<div style="padding:32px;text-align:center;"><div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">Analyzing your data...</div><div style="width:40px;height:2px;background:var(--gold);margin:0 auto;animation:pulse 1s infinite;"></div></div>';
@@ -492,7 +492,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       updateDashboard(d);
       if(status){
         if (d._source === 'empty') { status.textContent='No CSV uploaded yet'; status.style.color='var(--text-dim)'; }
-        else { status.textContent='✓ Showing data from '+(d._filename||d._source); status.style.color='var(--green)'; }
+        else { const _src = d._filename || (d._source === 'api' ? 'your live POS connection' : d._source); status.textContent='✓ Showing data from '+_src; status.style.color='var(--green)'; }
       }
       if(zone){ zone.style.borderColor='var(--green)'; }
     } else {

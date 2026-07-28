@@ -129,7 +129,7 @@ body{-webkit-text-size-adjust:100%;background:var(--black);color:var(--text);fon
       <div class="kpi-card">
         <div class="kpi-label">Est. Weekly Labor</div>
         <div class="kpi-value" id="labor-weekly-cost">—</div>
-        <div class="kpi-sub" style="color:var(--orange);">⚠ Estimated · upload Gusto for real</div>
+        <div class="kpi-sub" style="color:var(--orange);">⚠ Estimated · real payroll via Gusto (coming soon)</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Revenue / Labor $</div>
@@ -190,7 +190,7 @@ body{-webkit-text-size-adjust:100%;background:var(--black);color:var(--text);fon
       </div>
       <div id="scheduling-list" style="padding:24px;text-align:center;font-size:12px;color:var(--text-dim);line-height:1.7;">
         Per-shift scheduling recommendations need real payroll and shift data.<br>
-        <span style="color:var(--gold);cursor:pointer;" onclick="navigate('data.html')">Connect Gusto →</span> to unlock staffing recommendations based on your actual labor costs and hours.
+        The <span style="color:var(--gold);">Gusto integration (coming soon)</span> will unlock staffing recommendations based on your actual labor costs and hours.
       </div>
     </div>
 
@@ -445,7 +445,7 @@ const months = HRZN.getMonths(d);
   // This includes LIVE sources with zero revenue (e.g. a freshly connected POS
   // with no sales): _source is 'api', not 'empty', but the derived figures are
   // just as fabricated — the ratio is literally 1/rate regardless of data.
-  const labNoData = labEmpty || !(weekly > 0);
+  const labNoData = !hrznHasUsableData(d); // central helper (same semantics as the 7/27 local fix)
   set('labor-weekly-cost', labNoData ? '—' : fmt(weeklyLaborCost));
   set('labor-savings', labNoData ? '—' : fmt(savings));
   set('labor-rev-ratio', labNoData || revRatio == null ? '—' : '$'+revRatio);
@@ -457,7 +457,7 @@ const months = HRZN.getMonths(d);
   }
 
   // Day weights
-  const dayWeights = {mon:0.85,tue:0.70,wed:0.95,thu:1.05,fri:1.45,sat:1.35,sun:1.10};
+  const dayWeights = ((HRZN.getBenchmarks && HRZN.getBenchmarks().dayWeights) || {mon:0.85,tue:0.70,wed:0.95,thu:1.05,fri:1.45,sat:1.35,sun:1.10}); // central: BENCHMARKS.restaurant
   const dayNames = {mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat',sun:'Sun'};
   const allDays = ['mon','tue','wed','thu','fri','sat','sun'];
 
@@ -472,7 +472,7 @@ const months = HRZN.getMonths(d);
   const laborByDay = document.getElementById('labor-by-day-list');
   if (labCard && (!canEstimateLaborDays && !labEmpty)) {
     // Non-restaurant: don't show a fabricated daily breakdown.
-    if (laborByDay) laborByDay.innerHTML = '<div style="padding:24px;text-align:center;font-size:12px;color:var(--text-dim);">Day-by-day labor needs real per-shift data. Connect Gusto to see this.</div>';
+    if (laborByDay) laborByDay.innerHTML = '<div style="padding:24px;text-align:center;font-size:12px;color:var(--text-dim);">Day-by-day labor needs real per-shift data — the Gusto integration (coming soon) will unlock this.</div>';
     const fn = document.getElementById('labor-by-day-footnote'); if (fn) fn.style.display = 'none';
   } else if(laborByDay && labEmpty) {
     laborByDay.innerHTML = '<div style="padding:24px;text-align:center;font-size:12px;color:var(--text-dim);">Upload your data to see estimated labor cost by day.</div>';
@@ -660,7 +660,7 @@ async function generateMoreLaborInsights() {
     const asked = Math.min(6, remaining);
     if (fresh.length === 0) {
       // Honest depth: model had nothing new to add
-      container.insertAdjacentHTML('beforeend', '<div style="padding:14px 16px;font-size:11px;color:var(--text-dim);font-style:italic;border-top:1px solid var(--border);">No further distinct insights from current data. Connect Gusto or upload more history for deeper analysis.</div>');
+      container.insertAdjacentHTML('beforeend', '<div style="padding:14px 16px;font-size:11px;color:var(--text-dim);font-style:italic;border-top:1px solid var(--border);">No further distinct insights from current data. Upload more history for deeper analysis (Gusto integration coming soon).</div>');
       _laborInsights._tapped = true;
     } else {
       renderLaborInsights(fresh, container, true);
@@ -668,7 +668,7 @@ async function generateMoreLaborInsights() {
       // A short return means the model honestly ran out of distinct angles — tap out
       // now rather than making the user click again for an empty result.
       if (fresh.length < asked) {
-        container.insertAdjacentHTML('beforeend', '<div style="padding:12px 16px;font-size:10px;color:var(--text-dim);font-style:italic;">That\'s the distinct labor analysis your current data supports. Connect Gusto or upload more history for deeper insights.</div>');
+        container.insertAdjacentHTML('beforeend', '<div style="padding:12px 16px;font-size:10px;color:var(--text-dim);font-style:italic;">That\'s the distinct labor analysis your current data supports. Upload more history for deeper insights (Gusto integration coming soon).</div>');
         _laborInsights._tapped = true;
       }
     }

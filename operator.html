@@ -591,8 +591,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     const alertsList = document.getElementById('op-alerts-list');
     // Empty state: no fabricated $0 alerts in the snapshot panel (no early return —
     // later init like the chat send listeners must still run).
-    if (d._source === 'empty') {
-      if (alertsList) alertsList.innerHTML = '<div style="font-size:11px;color:var(--text-dim);padding:6px 0;">No data yet — upload your CSV to see alerts.</div>';
+    if (!hrznHasUsableData(d)) {
+      if (alertsList) alertsList.innerHTML = '<div style="font-size:11px;color:var(--text-dim);padding:6px 0;">' + (d._source === 'empty' ? 'No data yet — upload your CSV to see alerts.' : 'No sales in your connected POS yet — alerts appear once sales come in.') + '</div>';
     } else {
 
     // Category awareness: which concepts apply, and what to call the avg-ticket metric.

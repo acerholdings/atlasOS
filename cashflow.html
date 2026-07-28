@@ -557,7 +557,8 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   // Empty state: industry estimates only make sense once revenue exists —
   // show dashes instead of flat-dollar estimated outflows against $0 income.
-  const cfEmpty = d._source === 'empty';
+  // Broadened: live sources with zero revenue must dash too (hasUsableData).
+  const cfEmpty = !hrznHasUsableData(d);
   // KPIs
   const estTag = anyEstimated ? ' (est.)' : '';
   set('cf-inflow', cfEmpty ? '—' : fmt(monthly));

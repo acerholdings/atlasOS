@@ -597,6 +597,22 @@ function hrznHasData() {
   return false;
 }
 
+// True when there is data worth deriving figures FROM — a real source AND
+// actual revenue. The distinction matters for live sources: a freshly
+// connected POS with zero sales has _source 'api' (not 'empty'), so guards
+// that only check _source render derived figures computed from nothing
+// (the labor page's 1/rate "$5.6" was the first caught specimen — the
+// class had 14 sites across the app). Pages should gate derived dollar
+// figures, ratios, and estimates on THIS, and gate onboarding/upload
+// messaging on _source checks.
+function hrznHasUsableData(d) {
+  try {
+    if (!d) d = (typeof HRZN !== 'undefined' && HRZN.getData) ? HRZN.getData() : null;
+    if (!d || d._source === 'empty') return false;
+    return (d.netSales || 0) > 0;
+  } catch (e) { return false; }
+}
+
 // ── Demo-toggle globals (used by the shared no-data banner) ──
 function hrznViewDemo(){ if (typeof HRZN !== 'undefined') HRZN.enableDemoMode(); }
 function hrznExitDemo(){ if (typeof HRZN !== 'undefined') HRZN.exitDemoMode(); }
@@ -1103,7 +1119,8 @@ const HRZN = {
         doordash: pickReal('doordash', dt.doordash),
       };
     } catch (e) {
-      return { labor:28, food:30, margin:15, weeklyRevenue:null, monthlyRevenue:null, avgCheck:null, doordash:null, discount:5 };
+      // Neutral cross-industry fallback (matches BENCHMARKS.other) — not restaurant numbers.
+      return { labor:25, food:35, margin:10, weeklyRevenue:null, monthlyRevenue:null, avgCheck:null, doordash:null, discount:10 };
     }
   },
 
@@ -1277,6 +1294,10 @@ const HRZN = {
       // restaurant-specific extras
       deliveryTargetPct: 10, // DoorDash etc.
       tipsTargetPct: 15,
+      // Industry-typical day-of-week revenue shape. SINGLE SOURCE — was
+      // duplicated in revenue.html, labor.html, and performance.html. Used
+      // only for clearly-labeled estimates on restaurant-category pages.
+      dayWeights: { mon:0.85, tue:0.70, wed:0.95, thu:1.05, fri:1.45, sat:1.35, sun:1.10 },
       pillars: ['revenue','cogs','labor','rent','marketing'],
       settingsFields: ['laborPct','cogsPct','avgTicket','deliveryTargetPct'],
       concepts: { delivery: true, tips: true, dayparts: true }, // lunch/dinner etc.
