@@ -300,7 +300,7 @@ function buildProductContext() {
     const raw = localStorage.getItem(ITEMS_KEY);
     if (!raw) return null;
     const d = JSON.parse(raw);
-    items = d.allItems || [];
+    items = [d.allItems, d.items].find(a => Array.isArray(a) && a.length) || [];
     cats = (d.categories||[]).slice(0,8).map(c => c.name + ': ' + fmt(c.netSales) + ' (' + c.pctOfNet + '%)').join('; ');
   }
   if (!items.length) return null;
@@ -444,9 +444,10 @@ function loadData() {
     } else {
       d = JSON.parse(raw);
     }
-    allItems = (d.allItems || d.items || []).map(i => ({
+    // First NON-empty array wins ([] is truthy — `a || b` picks an empty allItems over a populated items)
+    allItems = ([d.allItems, d.items].find(a => Array.isArray(a) && a.length) || []).map(i => ({
       ...i,
-      sold: i.sold || i.qty || 0,  // handle both field names
+      sold: i.sold || i.qty || i.qtySold || 0,  // handle all field-name variants
       netSales: i.netSales || i.net_sales || 0,
       grossSales: i.grossSales || i.gross_sales || 0,
       category: i.category || 'Uncategorized',

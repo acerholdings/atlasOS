@@ -2031,7 +2031,7 @@ CRITICAL — DO NOT FABRICATE TARGETS OR NUMBERS:
       const csvRaw = localStorage.getItem('hrzn-data-items');
       if (csvRaw) {
         const c = JSON.parse(csvRaw);
-        return { allItems: c.allItems || c.items || [], _source: 'csv' };
+        const _arr = [c.allItems, c.items].find(a => Array.isArray(a) && a.length) || []; return { allItems: _arr, _source: 'csv' }; // first NON-empty ([] is truthy, so `a||b` can pick an empty array over a full one)
       }
     } catch (e) {}
     return { allItems: [], _source: 'empty' };
