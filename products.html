@@ -477,7 +477,9 @@ function loadData() {
     // there's no real margin figure show "—" rather than a misleading 0.0%.
     // In demo mode, derive gross margin from the category's sample COGS profile so
     // the trial experience is complete and consistent with the P&L/Performance pages.
-    let hasMargin = (d.grossProfitMargin != null) || (d.grossProfit && d.grossSales);
+    // A margin of exactly 0 with no profit figures means NO DATA (generic CSVs
+    // carry no profit columns) — show a dash, not a confident '0.0%'.
+    let hasMargin = (d.grossProfitMargin != null && d.grossProfitMargin !== 0) || !!(d.grossProfit && d.grossSales);
     let margin = d.grossProfitMargin || (d.grossProfit && d.grossSales ? (d.grossProfit/d.grossSales*100) : 0);
     if (!hasMargin && demoActive && HRZN.getDemoData) {
       try {
