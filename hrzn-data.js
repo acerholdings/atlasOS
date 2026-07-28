@@ -2383,6 +2383,44 @@ window.addEventListener('hrzn-source-changed', () => {
 // Injected on every page except dashboard (which has the dashboard widget)
 // and operator (which IS the AI page)
 
+// ── DATA-SOURCE CHIPS (central) ──────────────────────────────
+// Every page used to carry its own copy of renderDataBadges — five drifted
+// variants across ten pages, all CSV-only, so pages said "not uploaded"
+// right next to a Live API badge. This is now the single implementation;
+// pages call HRZN.renderDataBadges(...) and their local copies are gone.
+// Live-awareness: when the active source is a live POS with synced data,
+// chips whose data the live sync actually covers show "live" instead.
+// Coverage is per-label: Sales Overview = always covered by a synced POS;
+// Item Sales = covered only when the synced payload really contains items;
+// anything else (e.g. Employee Sales) is NOT covered and keeps honest
+// CSV-upload semantics.
+HRZN.renderDataBadges = function (sources) {
+  const c = document.getElementById('page-data-sources');
+  if (!c) return;
+  let apiPayload = null;
+  const liveApi = (this.getSource() === 'api') && (function () {
+    try { apiPayload = JSON.parse(localStorage.getItem('hrzn-data-api') || 'null'); } catch (e) { apiPayload = null; }
+    return !!apiPayload;
+  })();
+  const LIVE_COVERED = {
+    'Sales Overview': function () { return true; },
+    'Item Sales': function (api) { const it = api && (api._items || api.items); return !!(it && it.length); }
+  };
+  c.innerHTML = sources.map(function (s) {
+    const stored = localStorage.getItem(s.key) || (s.oldKey ? localStorage.getItem(s.oldKey) : null);
+    const covered = LIVE_COVERED[s.label];
+    const live = liveApi && !!covered && covered(apiPayload);
+    const loaded = !!stored || live;
+    const color = loaded ? 'var(--green)' : 'var(--text-dim)';
+    const bg = loaded ? 'rgba(76,175,125,0.1)' : 'rgba(128,128,128,0.08)';
+    const border = loaded ? 'rgba(76,175,125,0.2)' : 'rgba(128,128,128,0.15)';
+    const suffix = live ? ' — live' : (loaded ? '' : ' — not uploaded');
+    return '<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:' + color + ';background:' + bg + ';border:1px solid ' + border + ';padding:3px 8px;border-radius:10px;margin-right:4px;">' +
+      '<span style="font-size:8px;">' + (loaded ? '●' : '○') + '</span> ' + s.label + suffix +
+    '</span>';
+  }).join('');
+};
+
 function hrznInjectFloatingAI() {
   // Don't inject on pages that already have AI front and center
   const page = window.location.pathname.split('/').pop();
