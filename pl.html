@@ -357,17 +357,10 @@ function plEstimates(bm, monthlyRev, laborRate){
       }, dx);
     }
   } catch(e) {}
-  return {
-    cogs: Math.round(monthlyRev*((bm.cogsPct||32)/100)),
-    labor: Math.round(monthlyRev*((laborRate||0)/100)),
-    rent:8500, utilities:1200, insurance:800, supplies:600,
-    marketing: cat==='online' ? Math.round(monthlyRev*((bm.cacPct||20)/100)) : 500,
-    fees: Math.round(monthlyRev*0.03),
-    shipping: Math.round(monthlyRev*((bm.shippingPct||12)/100)),
-    returns: Math.round(monthlyRev*((bm.returnsPct||8)/100)),
-    software: 300,
-    other:800, debt:7000
-  };
+  // Central, revenue-proportional (see HRZN.getExpenseEstimates) — the old
+  // flat dollars (rent 8500, debt 7000) made small shops look like they were
+  // drowning in defaults and let the AI diagnose crises from invented costs.
+  return HRZN.getExpenseEstimates(monthlyRev, laborRate);
 }
 const PL_PROMPT_LABELS = { rent:'Rent', utilities:'Utilities', insurance:'Insurance', supplies:'Supplies',
   shipping:'Shipping & Fulfillment', fees:'Payment/Platform Fees', returns:'Returns & Refunds', software:'Software & Tools', other:'Other' };
@@ -396,7 +389,7 @@ function getPLInsightValues(months, revenue){
   PL_ALL_LINES.forEach(f=>{ if(!(f in v)) v[f]=0; });
   const opex = lines.filter(f=>f!=='cogs').reduce((s,f)=>s+v[f],0);
   const anyEst=Object.values(isEst).some(x=>x);
-  const eTag=(f)=>isEst[f]?' [ESTIMATE \u2014 owner has not entered this]':'';
+  const eTag=(f)=>isEst[f]?' [ESTIMATE \u2014 owner has not entered this; treat as a neutral placeholder, do NOT flag it as a problem, crisis, or top issue]':'';
   // Generic expense lines for AI prompts (labor/cogs/marketing/debt get special lines elsewhere)
   const expenseLinesPrompt = lines
     .filter(f=>['cogs','labor','marketing','debt'].indexOf(f)===-1)
@@ -624,19 +617,19 @@ async function generatePLInsights(){
   const { system: plSystem, prompt: plBasePrompt } = HRZN.getInsightPrompt('pl', null, _plInsights.length ? { exclude: _plInsights.map(i=>i.title) } : {});
   const cogsTargetPct = plBm.cogsPct != null ? plBm.cogsPct : 35;
   const cogsLbl = plBm.cogsLabel || 'Cost of Goods'; // neutral fallback; category label wins when present
-  const estNote = anyInsEst ? `\nIMPORTANT: Lines marked [ESTIMATE] are industry-typical placeholder figures — the owner has NOT entered these costs yet. Do NOT treat them as the owner's actual spending and do NOT claim data is missing or corrupted. Where relevant, encourage entering real expenses on this page for accurate analysis.\n` : '';
+  const estNote = anyInsEst ? `\nIMPORTANT: Lines marked [ESTIMATE] are industry-typical placeholder figures — the owner has NOT entered these costs yet. Do NOT treat them as the owner's actual spending, do NOT diagnose a crisis, overage, or \"biggest issue\" from any [ESTIMATE] line, and do NOT claim data is missing or corrupted. Where relevant, encourage entering real expenses on this page for accurate analysis.\n` : '';
   const tipsLinePL = plConcepts.tips ? `\n- Tips: $${Math.round(d.tips||0).toLocaleString()} (${tipsPct}% of net sales)` : '';
   const ddLinePL = plConcepts.delivery ? `\n- DoorDash: ${ddPct}% of revenue` : '';
   const prompt = plBasePrompt + `
 
 P&L DATA (${months.toFixed(1)} month period) — USE THESE EXACT NUMBERS:${estNote}
 - Revenue (Net Sales): $${Math.round(revenue).toLocaleString()}
-- ${cogsLbl} (COGS): $${Math.round(cogs).toLocaleString()} (${cogsPct}% of revenue — target ~${cogsTargetPct}% for this business type — ${parseFloat(cogsPct)<=cogsTargetPct?'✅ at or below target':'⚠️ above target'})${eTag('cogs')}
+- ${cogsLbl} (COGS): $${Math.round(cogs).toLocaleString()} (${cogsPct}% of revenue — target ~${cogsTargetPct}% for this business type${isEst['cogs'] ? '' : ' — ' + (parseFloat(cogsPct)<=cogsTargetPct?'✅ at or below target':'⚠️ above target')})${eTag('cogs')}
 - Gross Profit: $${Math.round(grossProfit).toLocaleString()} (${grossPct}% margin)
 - Labor: $${Math.round(labor).toLocaleString()} (${laborPct}%${_plReal.labor ? ` — target ${laborTarget}% — ${laborOverageMo>0?'⚠️ $'+laborOverageMo.toLocaleString()+'/mo OVER target':'✅ at or below target'}` : ` — industry benchmark ${laborTarget}%; owner set NO labor target, so treat as context and do NOT claim $/mo over a target`})${eTag('labor')}
 ${expenseLinesPrompt}
 - Marketing: $${Math.round(marketing).toLocaleString()} ($${mktMo.toLocaleString()}/mo — room to grow to 2% = $${mktAt2pct.toLocaleString()}/mo, $${mktExtra.toLocaleString()}/mo extra budget available)${eTag('marketing')}
-- Debt Payments: $${Math.round(debt).toLocaleString()} (${debtPct}% — ${debtOverage>0?'⚠️ $'+debtOverage.toLocaleString()+' OVER 8% benchmark — $'+debtMoDrag.toLocaleString()+'/mo drag':'✅ within healthy range'})${eTag('debt')}
+- Debt Payments: $${Math.round(debt).toLocaleString()} (${debtPct}%${isEst['debt'] ? '' : ' — ' + (debtOverage>0?'⚠️ $'+debtOverage.toLocaleString()+' OVER 8% benchmark — $'+debtMoDrag.toLocaleString()+'/mo drag':'✅ within healthy range')})${eTag('debt')}
 - Total Expenses: $${Math.round(cogs+opex).toLocaleString()}
 - Net Profit: $${Math.round(netProfit).toLocaleString()} (${netPct}% margin)
 - Monthly Breakeven: $${Math.round(breakeven).toLocaleString()}/mo${tipsLinePL}

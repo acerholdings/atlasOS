@@ -1299,6 +1299,7 @@ const HRZN = {
       // only for clearly-labeled estimates on restaurant-category pages.
       dayWeights: { mon:0.85, tue:0.70, wed:0.95, thu:1.05, fri:1.45, sat:1.35, sun:1.10 },
       pillars: ['revenue','cogs','labor','rent','marketing'],
+      estPcts: { rent:9, utilities:3, insurance:1.5, supplies:2, marketing:2, other:2, debt:5, software:1 },
       settingsFields: ['laborPct','cogsPct','avgTicket','deliveryTargetPct'],
       concepts: { delivery: true, tips: true, dayparts: true }, // lunch/dinner etc.
       suggestedQuestions: [
@@ -1312,6 +1313,7 @@ const HRZN = {
     },
     retail: {
       label: 'Retail',
+      estPcts: { rent:11, utilities:2.5, insurance:1.5, supplies:1.5, marketing:2.5, other:2, debt:4, software:1 },
       laborPct: 18,          // specialty retail 10-20%
       cogsPct: 60,           // ~40% gross margin
       cogsLabel: 'Cost of Goods',
@@ -1334,6 +1336,7 @@ const HRZN = {
     },
     online: {
       label: 'Online / E-commerce',
+      estPcts: { rent:2, utilities:1, insurance:1, supplies:1, marketing:0, other:2, debt:3, software:2 },
       laborPct: 0,           // often founder-run; not a primary lever
       cogsPct: 55,           // ~45% gross margin target
       cogsLabel: 'Cost of Goods',
@@ -1360,6 +1363,7 @@ const HRZN = {
     },
     service: {
       label: 'Service Business',
+      estPcts: { rent:12, utilities:3, insurance:3, supplies:2.5, marketing:2.5, other:2, debt:4, software:1.5 },
       laborPct: 30,          // service delivery labor — primary cost lever
       cogsPct: 20,           // materials, parts, supplies
       cogsLabel: 'Materials & Supplies',
@@ -1382,6 +1386,7 @@ const HRZN = {
     },
     other: {
       label: 'Other',
+      estPcts: { rent:10, utilities:2.5, insurance:2, supplies:2, marketing:2, other:2, debt:4, software:1 },
       laborPct: 25,          // generic cross-industry baseline
       cogsPct: 35,
       cogsLabel: 'Cost of Goods',
@@ -2404,6 +2409,37 @@ window.addEventListener('hrzn-source-changed', () => {
 // ── FLOATING AI BUTTON ───────────────────────────────────────────────────────
 // Injected on every page except dashboard (which has the dashboard widget)
 // and operator (which IS the AI page)
+
+// ── EXPENSE ESTIMATES (central, revenue-proportional) ────────
+// Replaces the flat dollar constants that lived in pl.html and cashflow.html
+// (rent:8500, debt:7000, ...). Flat dollars made small businesses look like
+// they were drowning (a $31k/mo shop got 27% rent + 22% debt from defaults,
+// and the AI diagnosed a debt crisis from invented numbers) and made big
+// ones look implausibly lean. Estimates are now % of monthly revenue, tuned
+// per category via BENCHMARKS[cat].estPcts.
+HRZN.getExpenseEstimates = function (monthlyRev, laborRatePct) {
+  const bm = (this.getBenchmarks ? this.getBenchmarks() : {}) || {};
+  const g = (this.BENCHMARKS && this.BENCHMARKS.other) || {};
+  const p = bm.estPcts || g.estPcts || {};
+  const M = monthlyRev || 0;
+  const pc = (k, fb) => (p[k] != null ? p[k] : fb);
+  const pct = (x) => Math.round(M * x / 100);
+  return {
+    cogs: Math.round(M * ((bm.cogsPct != null ? bm.cogsPct : 35) / 100)),
+    labor: Math.round(M * ((laborRatePct || 0) / 100)),
+    rent: pct(pc('rent', 10)),
+    utilities: pct(pc('utilities', 2.5)),
+    insurance: pct(pc('insurance', 2)),
+    supplies: pct(pc('supplies', 2)),
+    marketing: bm._category === 'online' ? Math.round(M * ((bm.cacPct || 20) / 100)) : pct(pc('marketing', 2)),
+    fees: Math.round(M * 0.03),
+    shipping: Math.round(M * ((bm.shippingPct || 12) / 100)),
+    returns: Math.round(M * ((bm.returnsPct || 8) / 100)),
+    software: pct(pc('software', 1)),
+    other: pct(pc('other', 2)),
+    debt: pct(pc('debt', 4))
+  };
+};
 
 // ── DATA-SOURCE CHIPS (central) ──────────────────────────────
 // Every page used to carry its own copy of renderDataBadges — five drifted

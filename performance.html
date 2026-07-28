@@ -215,7 +215,7 @@ body{-webkit-text-size-adjust:100%;background:var(--black);color:var(--text);fon
       <div class="trend-card" id="perf-turn-card"><div class="kpi-label">Table Turn Rate</div><div class="kpi-value" id="perf-turn-rate">—</div><div style="font-size:11px;color:var(--green);margin-bottom:12px;">Needs orders API</div><svg id="spark-turn" style="display:none" height="40" width="100%" viewBox="0 0 100 40"><polyline points="0,28 15,26 30,24 45,22 60,18 75,16 90,14 100,12" fill="none" stroke="var(--green)" stroke-width="1.5" opacity="0.8"/></svg></div>
     </div>
     <div class="comp-grid fade-3">
-      <div class="card">
+      <div class="card" id="vs-week-card">
         <div class="card-header"><div class="card-title">This Week vs Last Week <span style="font-size:10px;color:var(--orange);">⚠ Est.</span></div><div style="display:flex;gap:16px;font-size:10px;align-items:center;"><span style="flex:1;"></span><span style="color:var(--text);width:70px;text-align:right;">This week</span><span style="color:var(--text-dim);width:70px;text-align:right;">Last week</span><span style="width:50px;"></span></div></div>
         <div class="card-body">
           <div class="vs-row"><div style="font-size:12px;color:var(--text);flex:1;">Revenue</div><div style="font-size:12px;font-family:'Space Grotesk',sans-serif;color:var(--text);width:70px;text-align:right;" id="vs-rev-this">—</div><div style="font-size:12px;font-family:'Space Grotesk',sans-serif;color:var(--text-dim);width:70px;text-align:right;" id="vs-rev-last">—</div><div style="font-size:11px;width:50px;text-align:right;color:var(--green);" id="vs-rev-change">—</div></div>
@@ -602,6 +602,36 @@ const countUp = (id,target,format) => {
   set('vs-covers-last', lastItems == null ? '—' : lastItems.toLocaleString());
   set('vs-check-this', '$'+parseFloat(d.avgCheck||0).toFixed(2));
   set('vs-check-last', '—');
+  // Week-over-week is only honest with a real daily series: with ≥14 days of
+  // _dailyRevenue, show a REAL this-week vs last-week revenue comparison and
+  // hide rows that have no weekly series; otherwise hide the whole card (the
+  // old version showed the period AVERAGE labeled "This week" beside all-dash
+  // "Last week" columns).
+  try {
+    const vsCard = document.getElementById('vs-week-card');
+    const dser = Array.isArray(d._dailyRevenue) ? d._dailyRevenue.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))) : [];
+    if (vsCard) {
+      if (dser.length >= 14 && hrznHasUsableData(d)) {
+        const last14 = dser.slice(-14);
+        const lastW = last14.slice(0,7).reduce((sm,r)=>sm+(r.revenue||0),0);
+        const thisW = last14.slice(7).reduce((sm,r)=>sm+(r.revenue||0),0);
+        set('vs-rev-this', fmt(Math.round(thisW)));
+        set('vs-rev-last', fmt(Math.round(lastW)));
+        const chEl = document.getElementById('vs-rev-change');
+        if (chEl && lastW > 0) {
+          const ch = Math.round((thisW - lastW) / lastW * 100);
+          chEl.textContent = (ch >= 0 ? '+' : '') + ch + '%';
+          chEl.style.color = ch >= 0 ? 'var(--green)' : 'var(--red)';
+        }
+        vsCard.querySelectorAll('.vs-row').forEach(row => { if (!row.querySelector('#vs-rev-this')) row.style.display = 'none'; });
+        const estTagEl = vsCard.querySelector('.card-title span');
+        if (estTagEl) estTagEl.style.display = 'none'; // it's real data now
+        vsCard.style.display = '';
+      } else {
+        vsCard.style.display = 'none';
+      }
+    }
+  } catch (e) {}
   set('vs-labor-this', laborApplies ? (laborPct + '%' + (laborIsEst ? ' (est.)' : '')) : '—');
   // Keep the top Labor Cost KPI tile consistent with this same rate (was blank + fake "+3.1%").
   set('perf-labor-cost', laborApplies ? (laborPct + '%' + (laborIsEst ? ' (est.)' : '')) : '—');
