@@ -114,6 +114,79 @@ function hrznIsDemo() {
   return new URLSearchParams(window.location.search).get('demo') === 'true';
 }
 
+// ── SESSION REFRESH ──────────────────────────────────────────
+// Supabase access tokens expire (~1 hour). Login stores hrzn_refresh but
+// nothing ever used it, so a tab left open past expiry started 401ing
+// everywhere — "Invalid session" in the AI chat and a no-data badge, while
+// Data Sources still showed the POS as connected (the POS connection itself
+// was fine; only the user's session pass had expired). Fix: decode the JWT
+// expiry and renew with the refresh token — on page load, whenever the tab
+// becomes visible again (the "came back to the computer" case), and on a
+// 10-minute timer for long-open tabs.
+// NOTE: hrzn-data.js otherwise only talks to /api/* — these are the same
+// public URL + publishable anon key already embedded in login/signup.
+const HRZN_SUPA_URL = 'https://kkxsntywxvgpjiuaniuc.supabase.co';
+const HRZN_SUPA_ANON = 'sb_publishable_vwR5ZxytRXriGjsIFSUvBg_uUH21z8U';
+let __hrznRefreshing = null;
+function hrznTokenExpMs() {
+  try {
+    const t = localStorage.getItem('hrzn_token');
+    if (!t) return 0;
+    const payload = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return (payload.exp || 0) * 1000;
+  } catch (e) { return 0; }
+}
+function hrznRefreshSession() {
+  if (__hrznRefreshing) return __hrznRefreshing; // single-flight: never two refreshes at once
+  const rt = localStorage.getItem('hrzn_refresh');
+  if (!rt) return Promise.resolve(false);
+  __hrznRefreshing = (async () => {
+    try {
+      const r = await fetch(HRZN_SUPA_URL + '/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': HRZN_SUPA_ANON },
+        body: JSON.stringify({ refresh_token: rt })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok && data.access_token) {
+        localStorage.setItem('hrzn_token', data.access_token);
+        if (data.refresh_token) localStorage.setItem('hrzn_refresh', data.refresh_token);
+        if (data.user) localStorage.setItem('hrzn_user', JSON.stringify(data.user));
+        return true;
+      }
+      // Definitive rejection (revoked/expired refresh token): the session is
+      // dead — send the user to sign in rather than leave the broken
+      // half-state. Network errors do NOT land here; we keep tokens and retry
+      // on the next trigger.
+      if ((r.status === 400 || r.status === 401) && !hrznIsDemo()) {
+        localStorage.removeItem('hrzn_token');
+        localStorage.removeItem('hrzn_refresh');
+        window.location.href = 'login.html?expired=1';
+      }
+      return false;
+    } catch (e) {
+      return false; // network blip: keep tokens, retry on next trigger
+    } finally {
+      __hrznRefreshing = null;
+    }
+  })();
+  return __hrznRefreshing;
+}
+function hrznEnsureFreshToken() {
+  if (!localStorage.getItem('hrzn_token')) return Promise.resolve(false);
+  const msLeft = hrznTokenExpMs() - Date.now();
+  if (msLeft < 5 * 60 * 1000) return hrznRefreshSession(); // expired, or expires within 5 min
+  return Promise.resolve(true);
+}
+// Keep the session alive: on script load, on tab wake, and every 10 minutes.
+try {
+  hrznEnsureFreshToken();
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) hrznEnsureFreshToken();
+  });
+  setInterval(hrznEnsureFreshToken, 10 * 60 * 1000);
+} catch (e) {}
+
 // ── CENTRAL BRANDING (logo + favicons) ──────────────────────────────
 // One place that brands every app page. Runs from hrznSetupSidebar() (which
 // every app page calls), so no per-page edits are needed:
