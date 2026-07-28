@@ -442,12 +442,16 @@ const months = HRZN.getMonths(d);
   } else {
   // Empty state: dollar figures and the revenue/labor ratio are pure math on the
   // estimated rate — fabricated noise without revenue. Show dashes instead.
-  set('labor-weekly-cost', labEmpty ? '—' : fmt(weeklyLaborCost));
-  set('labor-savings', labEmpty ? '—' : fmt(savings));
-  set('labor-rev-ratio', labEmpty || revRatio == null ? '—' : '$'+revRatio);
+  // This includes LIVE sources with zero revenue (e.g. a freshly connected POS
+  // with no sales): _source is 'api', not 'empty', but the derived figures are
+  // just as fabricated — the ratio is literally 1/rate regardless of data.
+  const labNoData = labEmpty || !(weekly > 0);
+  set('labor-weekly-cost', labNoData ? '—' : fmt(weeklyLaborCost));
+  set('labor-savings', labNoData ? '—' : fmt(savings));
+  set('labor-rev-ratio', labNoData || revRatio == null ? '—' : '$'+revRatio);
   set('labor-pct', laborPct + '%');
   const _lm = (HRZN.getLaborRateMeta ? HRZN.getLaborRateMeta() : {source:'fallback'});
-  set('labor-pct-sub', labEmpty ? 'Estimated rate · upload data'
+  set('labor-pct-sub', labNoData ? 'Estimated rate · upload data'
     : (_lm.source === 'fallback' ? 'Assumed at your business-type benchmark · set your real rate in Settings'
     : (laborPct > tgt.labor ? (laborPct-tgt.labor).toFixed(1)+'pts above '+tgt.labor+'% target' : 'On target')));
   }
