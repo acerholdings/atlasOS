@@ -312,14 +312,15 @@ function hrznSetupSidebar() {
   // Nav "Alerts" badge: show the REAL count (critical + warning), one source of truth.
   // Hide the badge entirely when the count is 0 so it doesn't show a misleading dot.
   try {
-    if (typeof HRZN !== 'undefined' && HRZN.getAlertCount) {
-      const n = HRZN.getAlertCount();
-      document.querySelectorAll('.nav-badge').forEach(b => {
-        b.textContent = n;
-        b.style.display = n > 0 ? '' : 'none';
-      });
-    }
-  } catch(e) {}
+    const n = (typeof HRZN !== 'undefined' && HRZN.getAlertCount) ? (HRZN.getAlertCount() || 0) : 0;
+    document.querySelectorAll('.nav-badge').forEach(b => {
+      b.textContent = n;
+      b.style.display = n > 0 ? '' : 'none';
+    });
+  } catch(e) {
+    // On any failure, hide rather than show the markup's default "0".
+    try { document.querySelectorAll('.nav-badge').forEach(b => { b.style.display = 'none'; }); } catch(e2) {}
+  }
 }
 
 // ── MULTI-BUSINESS SWITCHER ──────────────────────────────────────────

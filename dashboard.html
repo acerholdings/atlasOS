@@ -702,6 +702,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if(!dashEmpty && dashTicketApplies && avgCheck > 0 && tgt.check!=null && avgCheck < tgt.check) alerts.push({icon:'📈',color:'var(--orange)',bg:'rgba(224,140,53,0.1)',title:dashTicketLabel+' $'+avgCheck+' below $'+tgt.check+' target',desc:'Focus on lifting the average sale',link:'products.html'});
   if(!dashEmpty && discountPct <= tgt.discount) alerts.push({icon:'✓',color:'var(--green)',bg:'rgba(76,175,125,0.1)',title:'Discount rate '+discountPct+'% -- healthy',desc:'Below the '+(dashBm.discountMaxPct || 6)+'% warning threshold for your business type',link:'alerts.html'});
 
+  // Never render an empty void: when no alert fired (everything at/inside
+  // thresholds), say so explicitly.
+  if (!alerts.length) {
+    alerts.push({icon:'\u2713',color:'var(--green)',bg:'rgba(76,175,125,0.1)',title:'All clear',desc:'No critical alerts right now \u2014 key metrics are inside their thresholds',link:'alerts.html'});
+  }
   const alertsList = document.getElementById('dash-alerts-list');
   if(alertsList) {
     alertsList.innerHTML = '';
