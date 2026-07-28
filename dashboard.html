@@ -700,7 +700,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const dashTicketLabel = dashBm.avgTicketLabel || 'Avg item price';
   if(!dashEmpty && dashConcepts.delivery && tgt.doordash!=null && doorDashPct < tgt.doordash) alerts.push({icon:'🚗',color:'var(--orange)',bg:'rgba(224,140,53,0.1)',title:'DoorDash at '+doorDashPct+'% -- below '+tgt.doordash+'% target',desc:'Est. '+fmt(Math.round(m.ddGapWeekly))+'/week revenue gap',link:'sales.html'});
   if(!dashEmpty && dashTicketApplies && avgCheck > 0 && tgt.check!=null && avgCheck < tgt.check) alerts.push({icon:'📈',color:'var(--orange)',bg:'rgba(224,140,53,0.1)',title:dashTicketLabel+' $'+avgCheck+' below $'+tgt.check+' target',desc:'Focus on lifting the average sale',link:'products.html'});
-  if(!dashEmpty && discountPct <= tgt.discount) alerts.push({icon:'✓',color:'var(--green)',bg:'rgba(76,175,125,0.1)',title:'Discount rate '+discountPct+'% -- healthy',desc:'Below the '+(dashBm.discountMaxPct || 6)+'% warning threshold for your business type',link:'alerts.html'});
+  // Discounts: symmetric — praise under target, WARN over it. (Was praise-only,
+  // so a breached target produced silence.) Copy cites the SAME number the
+  // comparison used (tgt.discount), not a different benchmark.
+  if(!dashEmpty && discountPct <= tgt.discount) alerts.push({icon:'✓',color:'var(--green)',bg:'rgba(76,175,125,0.1)',title:'Discount rate '+discountPct+'% -- healthy',desc:'At or below your '+tgt.discount+'% target',link:'alerts.html'});
+  if(!dashEmpty && discountPct > tgt.discount) alerts.push({icon:'🏷️',color:'var(--orange)',bg:'rgba(224,140,53,0.1)',title:'Discount rate '+discountPct+'% -- above '+tgt.discount+'% target',desc:'~'+fmt(Math.round(weekly*(discountPct-tgt.discount)/100))+'/week given up vs target',link:'alerts.html'});
 
   // Never render an empty void: when no alert fired (everything at/inside
   // thresholds), say so explicitly.
