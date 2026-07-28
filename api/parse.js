@@ -82,8 +82,8 @@ Return ONLY JSON.`
           return parseFloat(m[m.length-1].replace(/[$,]/g,'')) || 0;
         };
   
-        const grossSales = parseAmt('Gross Sales');
-        const netSales = parseAmt('Net Sales');
+        let grossSales = parseAmt('Gross Sales');
+        let netSales = parseAmt('Net Sales');
         const grossProfit = parseAmt('Gross Profit');
         const grossProfitMargin = parseFloat((lines.find(l=>l.startsWith('Gross Profit Margin'))||'').replace(/[^0-9.]/g,'')) || 0;
   
@@ -182,6 +182,75 @@ Return ONLY JSON.`
         }
   
         // Calculate pct of net for each item
+        // ── GENERIC TABULAR FALLBACK ─────────────────────────────
+        // The block above parses CLOVER's Item Sales export layout
+        // specifically (summary header block + category/item row patterns).
+        // Retail/Square/other platforms export plain header+rows tables
+        // (e.g. "Item,Category,Qty Sold,Net Sales"), which match none of the
+        // Clover patterns — items came out empty and the Products page went
+        // blank while the upload chip showed green. When the Clover pass
+        // yields nothing, retry as a generic table: find a header row with
+        // an item column + a sales column (flexible names), map rows, and
+        // build the exact same output shape.
+        if (items.length === 0) {
+          // The Clover pass above may have misread generic rows as category
+          // headers (they don't start with commas) — wipe those artifacts so
+          // the summary only contains categories the fallback actually built.
+          for (const k in categories) delete categories[k];
+          const norm = (h) => String(h || '').toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
+          let headerIdx = -1, cols = null;
+          for (let i = 0; i < Math.min(lines.length, 10); i++) {
+            if (!lines[i]) continue;
+            const hp = parseCSVLine(lines[i]).map(norm);
+            const nameI = hp.findIndex(h => ['item', 'item name', 'product', 'product name', 'name', 'sku', 'description'].includes(h));
+            const netI = hp.findIndex(h => ['net sales', 'netsales', 'revenue', 'sales', 'amount', 'total sales', 'net'].includes(h));
+            if (nameI !== -1 && netI !== -1) {
+              cols = {
+                name: nameI, net: netI,
+                cat: hp.findIndex(h => ['category', 'dept', 'department', 'type', 'collection'].includes(h)),
+                sold: hp.findIndex(h => ['qty sold', 'quantity', 'qty', 'sold', 'units', 'units sold', 'count'].includes(h)),
+                gross: hp.findIndex(h => ['gross sales', 'grosssales', 'gross'].includes(h))
+              };
+              headerIdx = i;
+              break;
+            }
+          }
+          if (cols) {
+            for (let i = headerIdx + 1; i < lines.length; i++) {
+              if (!lines[i]) continue;
+              const p = parseCSVLine(lines[i]);
+              const name = (p[cols.name] || '').replace(/"/g, '').trim();
+              if (!name || /^total/i.test(name)) continue;
+              const net = cleanAmt(p[cols.net]);
+              const sold = cols.sold !== -1 ? cleanInt(p[cols.sold]) : 0;
+              if (net === 0 && sold === 0) continue;
+              const category = cols.cat !== -1 ? ((p[cols.cat] || '').replace(/"/g, '').trim() || 'Uncategorized') : 'Uncategorized';
+              const gross = cols.gross !== -1 ? cleanAmt(p[cols.gross]) : net;
+              const item = {
+                name, category,
+                grossSales: Math.round(gross * 100) / 100,
+                netSales: Math.round(net * 100) / 100,
+                sold, refunded: 0, discounts: 0,
+                avgPrice: sold > 0 ? Math.round(net / sold * 100) / 100 : 0,
+                grossProfit: 0, profitMargin: 0
+              };
+              items.push(item);
+              if (!categories[category]) categories[category] = { name: category, grossSales: 0, netSales: 0, sold: 0, items: [] };
+              categories[category].grossSales += item.grossSales;
+              categories[category].netSales += item.netSales;
+              categories[category].sold += sold;
+              categories[category].items.push(item);
+            }
+          }
+          // Generic tables have no summary header block — derive totals from rows.
+          if (items.length && netSales === 0) {
+            netSales = Math.round(items.reduce((sm, i) => sm + i.netSales, 0) * 100) / 100;
+          }
+          if (items.length && grossSales === 0) {
+            grossSales = Math.round(items.reduce((sm, i) => sm + i.grossSales, 0) * 100) / 100;
+          }
+        }
+
         items.forEach(item => {
           item.pctOfNet = netSales > 0 ? Math.round(item.netSales / netSales * 1000) / 10 : 0;
         });
