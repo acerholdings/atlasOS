@@ -348,13 +348,26 @@ export default async function handler(req, res) {
         // labor RATE is a fallback estimate — only persist it when the front-end
         // actually sends one, so an unset rate stays NULL and the app falls back
         // to its labeled default rather than being pinned to a hardcoded number.
+        // Targets are the OWNER'S goals. "Unset" must persist as NULL so the app
+        // falls back to the business-type benchmark (HRZN.getTargets does this).
+        // The old code used `data.x || <restaurant default>`, which meant every
+        // save stamped 28/30/12000/15/10/5 onto the row — inventing restaurant
+        // goals for retail/service businesses and silently resurrecting cleared
+        // values (blank -> `||` -> default -> written back to the cloud).
+        // settings.html already sends unset fields as null/''/undefined and shows
+        // benchmarks as placeholders only; this is the matching server-side half.
+        const numOrNull = (v) => {
+          if (v === undefined || v === null || v === '') return null;
+          const n = +v;
+          return isNaN(n) ? null : n;
+        };
         const settingsBody = {
-          target_labor_pct: data.labor || 28,
-          target_food_cost_pct: data.food || 30,
-          target_weekly_revenue: data.revenue || 12000,
-          target_avg_check: data.check || 15,
-          target_doordash_pct: data.doordash || 10,
-          target_discount_pct: data.discount || 5,
+          target_labor_pct: numOrNull(data.labor),
+          target_food_cost_pct: numOrNull(data.food),
+          target_weekly_revenue: numOrNull(data.revenue),
+          target_avg_check: numOrNull(data.check),
+          target_doordash_pct: numOrNull(data.doordash),
+          target_discount_pct: numOrNull(data.discount),
           items_csv_filename: data.items_csv_filename || null,
         };
         if (data.labor_rate_pct != null && data.labor_rate_pct !== '' && !isNaN(+data.labor_rate_pct)) {
