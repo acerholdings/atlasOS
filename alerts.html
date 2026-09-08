@@ -286,7 +286,7 @@ function buildAlertsContext(d) {
     'Items Sold: ' + items.toLocaleString() + ' (' + Math.round(items/weeks) + '/week)',
     'COMBINED addressable opportunity: $' + combinedPeriod.toLocaleString() + ' this period ($' + combinedAnnual.toLocaleString() + '/yr) = revenue gap' + (deliveryApplies ? ' + DoorDash gap' : '') + (ticketApplies ? ' + price gap' : ''),
     '',
-    'RULES: Use ONLY numbers above. Never recalculate. When recommending improvements, the GOAL is always the stated target above (e.g. the labor target) — do NOT invent a different or "interim" target number; if suggesting a phased approach, describe the steps but keep the stated target as the end goal. When referencing total opportunity, use $' + combinedPeriod.toLocaleString() + ' this period. Include exactly 3 wins and 3 opportunities.'
+    'RULES: Use ONLY numbers above. Never recalculate. When recommending improvements, the GOAL is always the stated target above (e.g. the labor target) — do NOT invent a different or "interim" target number; if suggesting a phased approach, describe the steps but keep the stated target as the end goal. When referencing total opportunity, use $' + combinedPeriod.toLocaleString() + ' this period. Aim for a mix of wins and opportunities, but follow the honesty rule above: return only what this data genuinely supports and stop early rather than padding to a fixed count.'
   ];
   return lines.filter(function(l){ return l !== null; }).join('\n');
 }
