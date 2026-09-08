@@ -787,13 +787,23 @@ async function hrznLoadFromCloud() {
       if (data.settings.items_csv_filename) {
         merged._cachedItemsFilename = data.settings.items_csv_filename;
       }
+      // Cloud targets fill in only where the local value is genuinely UNSET.
+      // Was `a || b`, which treated a deliberate 0 as unset — and the discount
+      // line ended in `|| 5`, hardcoding a restaurant default on the way in
+      // (so a cleared target came back as 5 and the next save wrote it to the
+      // cloud). NULL means unset: getTargets() then falls back to the
+      // business-type benchmark, which is the correct behaviour.
       merged.targets = merged.targets || {};
-      merged.targets.labor = merged.targets.labor || data.settings.target_labor_pct;
-      merged.targets.food = merged.targets.food || data.settings.target_food_cost_pct;
-      merged.targets.revenue = merged.targets.revenue || data.settings.target_weekly_revenue;
-      merged.targets.check = merged.targets.check || data.settings.target_avg_check;
-      merged.targets.doordash = merged.targets.doordash || data.settings.target_doordash_pct;
-      merged.targets.discount = merged.targets.discount || data.settings.target_discount_pct || 5;
+      const _unset = (v) => v === undefined || v === null || v === '';
+      const _fill = (key, cloudVal) => {
+        if (_unset(merged.targets[key]) && !_unset(cloudVal)) merged.targets[key] = cloudVal;
+      };
+      _fill('labor', data.settings.target_labor_pct);
+      _fill('food', data.settings.target_food_cost_pct);
+      _fill('revenue', data.settings.target_weekly_revenue);
+      _fill('check', data.settings.target_avg_check);
+      _fill('doordash', data.settings.target_doordash_pct);
+      _fill('discount', data.settings.target_discount_pct);
       if (data.settings.labor_rate_pct != null && !merged.laborRate) {
         merged.laborRate = { value: +data.settings.labor_rate_pct, mode: 'fallback', _restoredFromCloud: true };
       }
